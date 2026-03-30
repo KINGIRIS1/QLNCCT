@@ -11,20 +11,17 @@ interface RecordFormProps {
 
 // Dữ liệu danh sách xã/phường (Giống như trong App.tsx để đồng bộ)
 const PREDEFINED_NEW_COMMUNES = [
-  'Chơn Thành', 
-  'Minh Hưng', 
-  'Nha Bích'
+  'Bình Long',
+  'An Lộc'
 ].sort((a, b) => a.localeCompare(b, 'vi'));
 
 const PREDEFINED_OLD_COMMUNES = [
-  'Hưng Long',
-  'Minh Hưng',
-  'Minh Lập',
-  'Minh Long',
-  'Minh Thắng',
-  'Minh Thành',
-  'Nha Bích',
-  'Thành Tâm'
+  'Hưng Chiến',
+  'An Lộc',
+  'Thanh Lương',
+  'Phú Thịnh',
+  'Thanh Phú',
+  'Phú Đức'
 ].sort((a, b) => a.localeCompare(b, 'vi'));
 
 const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSubmit, onCancel }) => {

@@ -45,11 +45,11 @@ const ROLE_PERMISSIONS: Record<UserRole, {
 
 // Dữ liệu danh sách xã/phường
 const PREDEFINED_NEW_COMMUNES = [
-  'Chơn Thành', 'Minh Hưng', 'Nha Bích'
+  'Bình Long', 'An Lộc'
 ].sort((a, b) => a.localeCompare(b, 'vi'));
 
 const PREDEFINED_OLD_COMMUNES = [
-  'Hưng Long', 'Minh Hưng', 'Minh Lập', 'Minh Long', 'Minh Thắng', 'Minh Thành', 'Nha Bích', 'Thành Tâm'
+  'Hưng Chiến', 'An Lộc', 'Thanh Lương', 'Phú Thịnh', 'Thanh Phú', 'Phú Đức'
 ].sort((a, b) => a.localeCompare(b, 'vi'));
 
 const PAGE_SIZE = 20; // Số lượng bản ghi trên mỗi trang
