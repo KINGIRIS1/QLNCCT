@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hệ Thống Quản Lý Ngăn Chặn Đất Đai</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f3f4f6;
+      }
+
+      /* FIX: Buộc các thành phần form sử dụng color-scheme sáng 
+         Điều này đảm bảo icon lịch (date picker) và mũi tên dropdown 
+         luôn có màu đen, không bị biến thành màu trắng khi OS ở Dark Mode */
+      input, select, textarea {
+        color-scheme: light;
+        color: #111827; /* Force text color to gray-900 */
+        background-color: #ffffff; /* Force background to white */
+      }
+
+      /* Đảm bảo icon lịch luôn hiển thị rõ */
+      input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 1;
+        display: block;
+        cursor: pointer;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "path": "https://esm.sh/path@^0.12.7"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
