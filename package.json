@@ -9,12 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.39.3",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.562.0",
+    "path": "^0.12.7",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "lucide-react": "^0.562.0",
-    "@supabase/supabase-js": "2.39.3",
-    "xlsx": "0.18.5",
-    "path": "^0.12.7"
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

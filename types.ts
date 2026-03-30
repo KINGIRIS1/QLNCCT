@@ -1,3 +1,9 @@
+export interface AttachedFile {
+  id: string;
+  name: string;
+  url: string;
+}
+
 // Định nghĩa chi tiết văn bản ngăn chặn
 export interface BlockingDocument {
   docNumber: string; // Số hiệu văn bản
@@ -30,6 +36,9 @@ export interface LandRecord {
   // Mới: Thông tin audit
   createdAt?: string; // Ngày nhập vào hệ thống
   createdBy?: string; // Người nhập liệu
+  
+  // Mới: Hỗ trợ đính kèm file
+  attached_files?: AttachedFile[];
 }
 
 // Kiểu dữ liệu cho Form (không có ID vì ID tự sinh)

@@ -6,7 +6,7 @@ import UserManagement from './components/UserManagement';
 import ChangePassword from './components/ChangePassword';
 import { supabase } from './supabaseClient';
 import { read, utils, writeFile } from 'xlsx';
-import { Search, Plus, Edit, Trash2, FileText, Lock, Unlock, MapPin, Printer, ArrowRight, Filter, XCircle, LogOut, UserCircle, Calendar, Building2, Info, RefreshCw, Loader2, WifiOff, Upload, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ShieldAlert, CheckCircle2, LayoutDashboard, Copy, Check, X, ArrowUpDown, ArrowUp, ArrowDown, UserPlus, Clock } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, FileText, Lock, Unlock, MapPin, Printer, ArrowRight, Filter, XCircle, LogOut, UserCircle, Calendar, Building2, Info, RefreshCw, Loader2, WifiOff, Upload, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ShieldAlert, CheckCircle2, LayoutDashboard, Copy, Check, X, ArrowUpDown, ArrowUp, ArrowDown, UserPlus, Clock, Paperclip } from 'lucide-react';
 
 // CẤU HÌNH PHÂN QUYỀN
 const ROLE_PERMISSIONS: Record<UserRole, {
@@ -359,7 +359,8 @@ function App() {
     notes: item.notes || '',
     isUnblocked: !!item.is_unblocked,
     createdAt: item.created_at || '',
-    createdBy: item.created_by || ''
+    createdBy: item.created_by || '',
+    attached_files: Array.isArray(item.attached_files) ? item.attached_files : []
   });
 
   const mapRecordToDb = (item: LandRecord) => ({
@@ -381,7 +382,8 @@ function App() {
     unblock_doc: item.unblockDoc,
     notes: item.notes,
     is_unblocked: item.isUnblocked,
-    created_by: item.createdBy // Lưu người nhập
+    created_by: item.createdBy, // Lưu người nhập
+    attached_files: item.attached_files || []
   });
 
   const fetchStats = useCallback(async () => {
@@ -1252,6 +1254,30 @@ function App() {
                             <div className="mt-2 text-xs bg-yellow-50 text-yellow-800 p-1.5 border border-yellow-200 rounded-sm italic">
                                 Lưu ý: {record.notes}
                             </div>
+                         )}
+
+                         {/* Hiển thị file đính kèm */}
+                         {record.attached_files && record.attached_files.length > 0 && (
+                           <div className="mt-2 pt-2 border-t border-dashed border-gray-300">
+                             <div className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
+                               <Paperclip size={12} /> Tài liệu đính kèm:
+                             </div>
+                             <div className="flex flex-wrap gap-1">
+                               {record.attached_files.map((file, idx) => (
+                                 <a 
+                                   key={idx} 
+                                   href={file.url} 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] hover:bg-blue-100 transition-colors border border-blue-200"
+                                   title={file.name}
+                                 >
+                                   <Download size={10} />
+                                   <span className="truncate max-w-[100px]">{file.name}</span>
+                                 </a>
+                               ))}
+                             </div>
+                           </div>
                          )}
                       </td>
                       <td className="px-3 py-2 border-r border-gray-300 text-center align-middle">

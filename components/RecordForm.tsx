@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LandRecord, LandRecordFormData, BlockingDocument, User } from '../types';
-import { Plus, Trash2, X, Save, AlertCircle, FileText } from 'lucide-react';
+import { Plus, Trash2, X, Save, AlertCircle, FileText, Paperclip, Loader2, Download } from 'lucide-react';
+import JSZip from 'jszip';
 
 interface RecordFormProps {
   initialData?: LandRecord;
@@ -105,6 +106,82 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
       const newDocs = formData.blockingDocuments.filter((_, i) => i !== index);
       setFormData(prev => ({ ...prev, blockingDocuments: newDocs }));
     }
+  };
+
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      alert('Vui lòng chỉ chọn file PDF!');
+      return;
+    }
+
+    setUploadingFile(true);
+    try {
+      // 1. Nén file PDF thành ZIP
+      const zip = new JSZip();
+      zip.file(file.name, file);
+      const zipBlob = await zip.generateAsync({ 
+          type: 'blob', 
+          compression: 'DEFLATE', 
+          compressionOptions: { level: 9 } // Mức nén cao nhất
+      });
+      
+      // 2. Chuyển ZIP thành Base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64data = (reader.result as string).split(',')[1];
+          resolve(base64data);
+        };
+      });
+      reader.readAsDataURL(zipBlob);
+      const base64 = await base64Promise;
+
+      // 3. Gửi lên Google Apps Script (THAY URL CỦA BẠN VÀO ĐÂY)
+      const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzMrV_Gd2Bk1aMZANZdjvJu8uu_IruG3LFxM_dVqD5swb6_bT8tVmEjkqQ4hgCmxSjWow/exec'; 
+      
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          fileName: `${file.name.replace('.pdf', '')}.zip`,
+          mimeType: 'application/zip',
+          base64: base64
+        }),
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8', // Dùng text/plain để tránh lỗi CORS
+        }
+      });
+      
+      const result = await response.json();
+      if (result.status === 'success') {
+        const newFile = { id: result.fileId, url: result.fileUrl, name: result.fileName };
+        setFormData(prev => ({
+          ...prev,
+          attached_files: [...(prev.attached_files || []), newFile]
+        }));
+        alert('Đã tải lên và đính kèm file thành công!');
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error: any) {
+      console.error('Lỗi upload:', error);
+      alert('Lỗi khi tải file lên: ' + error.message);
+    } finally {
+      setUploadingFile(false);
+      e.target.value = ''; // Reset input
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setFormData(prev => {
+      const newFiles = [...(prev.attached_files || [])];
+      newFiles.splice(index, 1);
+      return { ...prev, attached_files: newFiles };
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -382,6 +459,38 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                             className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none text-gray-900 bg-white"
                             placeholder="Ghi chú chung cho toàn bộ hồ sơ..."
                         />
+                    </div>
+
+                    {/* File Upload Section */}
+                    <div className="pt-4 border-t border-gray-100">
+                        <label className="block text-xs font-semibold text-gray-600 mb-2">Tài liệu đính kèm (PDF sẽ được nén thành ZIP)</label>
+                        
+                        <div className="flex items-center gap-3 mb-3">
+                            <label className={`flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-medium cursor-pointer transition-colors ${uploadingFile ? 'bg-gray-200 text-gray-500' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'}`}>
+                                {uploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
+                                {uploadingFile ? 'Đang nén & tải lên...' : 'Chọn file PDF'}
+                                <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} disabled={uploadingFile} />
+                            </label>
+                        </div>
+
+                        {/* Hiển thị danh sách file đã đính kèm */}
+                        {formData.attached_files && formData.attached_files.length > 0 && (
+                            <div className="space-y-2">
+                                {formData.attached_files.map((file, index) => (
+                                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 border border-gray-200 rounded-sm text-sm">
+                                        <div className="flex items-center gap-2 text-gray-700">
+                                            <Paperclip size={14} className="text-gray-400" />
+                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
+                                                {file.name}
+                                            </a>
+                                        </div>
+                                        <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-700 p-1">
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
