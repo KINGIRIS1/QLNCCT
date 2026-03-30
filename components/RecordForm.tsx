@@ -121,16 +121,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
 
     setUploadingFile(true);
     try {
-      // 1. Nén file PDF thành ZIP
-      const zip = new JSZip();
-      zip.file(file.name, file);
-      const zipBlob = await zip.generateAsync({ 
-          type: 'blob', 
-          compression: 'DEFLATE', 
-          compressionOptions: { level: 9 } // Mức nén cao nhất
-      });
-      
-      // 2. Chuyển ZIP thành Base64
+      // Chuyển file PDF thành Base64 trực tiếp (không nén ZIP)
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve) => {
         reader.onloadend = () => {
@@ -138,17 +129,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
           resolve(base64data);
         };
       });
-      reader.readAsDataURL(zipBlob);
+      reader.readAsDataURL(file);
       const base64 = await base64Promise;
 
-      // 3. Gửi lên Google Apps Script (THAY URL CỦA BẠN VÀO ĐÂY)
+      // Gửi lên Google Apps Script
       const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXbQyjKR4_BDAR33LMdxZldWmj7pJY4TDV4D6cLRWBNLP0QTcFKGR_eaOcKojZObNAtQ/exec'; 
       
       const response = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         body: JSON.stringify({
-          fileName: `${file.name.replace('.pdf', '')}.zip`,
-          mimeType: 'application/zip',
+          fileName: file.name,
+          mimeType: file.type,
           base64: base64
         }),
         headers: {
@@ -463,12 +454,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
 
                     {/* File Upload Section */}
                     <div className="pt-4 border-t border-gray-100">
-                        <label className="block text-xs font-semibold text-gray-600 mb-2">Tài liệu đính kèm (PDF sẽ được nén thành ZIP)</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-2">Tài liệu đính kèm (Chỉ hỗ trợ PDF)</label>
                         
                         <div className="flex items-center gap-3 mb-3">
                             <label className={`flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-medium cursor-pointer transition-colors ${uploadingFile ? 'bg-gray-200 text-gray-500' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'}`}>
                                 {uploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
-                                {uploadingFile ? 'Đang nén & tải lên...' : 'Chọn file PDF'}
+                                {uploadingFile ? 'Đang tải lên...' : 'Chọn file PDF'}
                                 <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} disabled={uploadingFile} />
                             </label>
                         </div>

@@ -80,11 +80,15 @@ INSERT INTO users (username, password, name, role)
 SELECT 'user', '123', 'Chuyên Viên Tra Cứu', 'user'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'user');
 
--- 1. Đảm bảo bảng có cột created_by (Người nhập)
+-- 1. Đảm bảo bảng có cột created_by (Người nhập) và attached_files
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'created_by') THEN
         ALTER TABLE land_records ADD COLUMN created_by text;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'attached_files') THEN
+        ALTER TABLE land_records ADD COLUMN attached_files jsonb DEFAULT '[]'::jsonb;
     END IF;
 END $$;
 
