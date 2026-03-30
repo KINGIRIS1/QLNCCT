@@ -1270,7 +1270,7 @@ function App() {
                                {record.attached_files.map((file, idx) => (
                                  <a 
                                    key={idx} 
-                                   href={file.url} 
+                                   href={`https://drive.google.com/uc?export=download&id=${file.id}`} 
                                    target="_blank" 
                                    rel="noopener noreferrer"
                                    className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] hover:bg-blue-100 transition-colors border border-blue-200"

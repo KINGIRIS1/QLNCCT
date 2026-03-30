@@ -471,7 +471,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                                     <div key={index} className="flex items-center justify-between bg-gray-50 p-2 border border-gray-200 rounded-sm text-sm">
                                         <div className="flex items-center gap-2 text-gray-700">
                                             <Paperclip size={14} className="text-gray-400" />
-                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
+                                            <a href={`https://drive.google.com/uc?export=download&id=${file.id}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
                                                 {file.name}
                                             </a>
                                         </div>
