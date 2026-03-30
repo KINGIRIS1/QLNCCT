@@ -1,31 +1,41 @@
 import React, { useState } from 'react';
-import { User, UserRole } from '../types';
-import { ShieldCheck, User as UserIcon, Lock } from 'lucide-react';
+import { User } from '../types';
+import { ShieldCheck, User as UserIcon, Lock, Loader2 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 interface LoginFormProps {
   onLogin: (user: User) => void;
 }
 
-// Mock User Database
-const MOCK_USERS = [
-  { username: 'admin', password: '123', name: 'Quản Trị Viên', role: 'admin' as UserRole },
-  { username: 'subadmin', password: '123', name: 'Phó Ban Quản Lý', role: 'subadmin' as UserRole },
-  { username: 'user', password: '123', name: 'Chuyên Viên Tra Cứu', role: 'user' as UserRole },
-];
-
 const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = MOCK_USERS.find(u => u.username === username && u.password === password);
-    
-    if (user) {
-      onLogin({ username: user.username, name: user.name, role: user.role });
-    } else {
-      setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
+    setError('');
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .eq('password', password)
+        .single();
+
+      if (error || !data) {
+        setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
+      } else {
+        onLogin({ id: data.id, username: data.username, name: data.name, role: data.role });
+      }
+    } catch (err) {
+      setError('Đã xảy ra lỗi khi kết nối đến máy chủ.');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -84,31 +94,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
 
           <button
             type="submit"
-            className="w-full bg-[#003b5c] text-white py-2.5 rounded font-bold uppercase hover:bg-[#002a42] transition shadow-sm mt-2 text-sm"
+            disabled={loading}
+            className="w-full bg-[#003b5c] text-white py-2.5 rounded font-bold uppercase hover:bg-[#002a42] transition shadow-sm mt-2 text-sm flex justify-center items-center"
           >
-            Đăng Nhập
+            {loading ? <Loader2 size={18} className="animate-spin" /> : 'Đăng Nhập'}
           </button>
         </form>
-
-        <div className="mt-6 border-t border-gray-100 pt-4">
-            <div className="text-xs text-gray-500 space-y-1">
-                <p><b>Tài khoản Demo & Quyền hạn:</b></p>
-                <div className="grid grid-cols-1 gap-2 bg-gray-50 p-2 rounded border border-gray-200">
-                    <div className="flex justify-between border-b border-gray-200 pb-1">
-                        <span><b>admin</b> / 123</span>
-                        <span className="text-blue-600 font-medium">Toàn quyền (Thêm/Sửa/Xóa/Reset)</span>
-                    </div>
-                    <div className="flex justify-between border-b border-gray-200 pb-1">
-                        <span><b>subadmin</b> / 123</span>
-                        <span className="text-green-600 font-medium">Thêm & Sửa (Không Xóa)</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span><b>user</b> / 123</span>
-                        <span className="text-gray-500 font-medium">Chỉ xem & Tìm kiếm</span>
-                    </div>
-                </div>
-            </div>
-        </div>
       </div>
       <div className="mt-4 text-xs text-gray-500">
         © 2024 Cổng thông tin đất đai điện tử

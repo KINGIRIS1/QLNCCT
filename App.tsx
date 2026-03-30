@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { LandRecord, LandRecordFormData, User, UserRole } from './types';
 import RecordForm from './components/RecordForm';
 import LoginForm from './components/LoginForm';
+import UserManagement from './components/UserManagement';
+import ChangePassword from './components/ChangePassword';
 import { supabase } from './supabaseClient';
 import { read, utils, writeFile } from 'xlsx';
 import { Search, Plus, Edit, Trash2, FileText, Lock, Unlock, MapPin, Printer, ArrowRight, Filter, XCircle, LogOut, UserCircle, Calendar, Building2, Info, RefreshCw, Loader2, WifiOff, Upload, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ShieldAlert, CheckCircle2, LayoutDashboard, Copy, Check, X, ArrowUpDown, ArrowUp, ArrowDown, UserPlus, Clock } from 'lucide-react';
@@ -55,6 +57,29 @@ const PAGE_SIZE = 20; // Số lượng bản ghi trên mỗi trang
 // --- SQL FIX COMMAND (PHIÊN BẢN CƯỜNG HÓA - MULTI CONDITION SEARCH) ---
 // Thay đổi: Thêm các tham số p_map_sheet, p_plot_number, p_commune để tìm kiếm chính xác
 const FIX_SQL_COMMAND = `
+-- 0. Tạo bảng users nếu chưa có
+CREATE TABLE IF NOT EXISTS users (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    username text UNIQUE NOT NULL,
+    password text NOT NULL,
+    name text NOT NULL,
+    role text NOT NULL CHECK (role IN ('admin', 'subadmin', 'user')),
+    created_at timestamptz DEFAULT now()
+);
+
+-- Thêm user mặc định nếu bảng trống
+INSERT INTO users (username, password, name, role)
+SELECT 'admin', '123', 'Quản Trị Viên', 'admin'
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin');
+
+INSERT INTO users (username, password, name, role)
+SELECT 'subadmin', '123', 'Phó Ban Quản Lý', 'subadmin'
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'subadmin');
+
+INSERT INTO users (username, password, name, role)
+SELECT 'user', '123', 'Chuyên Viên Tra Cứu', 'user'
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'user');
+
 -- 1. Đảm bảo bảng có cột created_by (Người nhập)
 DO $$
 BEGIN
@@ -257,6 +282,9 @@ function App() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<LandRecord | undefined>(undefined);
+  
+  const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   
   // State tìm kiếm và lọc
   const [searchTerm, setSearchTerm] = useState('');
@@ -804,14 +832,32 @@ function App() {
                 {currentUser.role === 'admin' ? 'Quản trị viên' : currentUser.role === 'subadmin' ? 'Phó ban' : 'Chuyên viên'}
               </div>
             </div>
-            <div className="h-8 w-px bg-blue-800 mx-1"></div>
-            <button 
-              onClick={handleLogout}
-              className="flex items-center gap-1 text-red-200 hover:text-white hover:bg-red-900/50 px-3 py-1.5 rounded transition text-xs font-medium border border-transparent hover:border-red-400"
-              title="Đăng xuất"
-            >
-               <LogOut size={14} /> Đăng xuất
-            </button>
+            <div className="flex items-center gap-2">
+              {currentUser.role === 'admin' && (
+                <button
+                  onClick={() => setShowUserManagement(true)}
+                  className="flex items-center gap-1 text-blue-200 hover:text-white hover:bg-blue-900/50 px-3 py-1.5 rounded transition text-xs font-medium border border-transparent hover:border-blue-400"
+                  title="Quản lý người dùng"
+                >
+                  <UserPlus size={14} /> Quản lý
+                </button>
+              )}
+              <button
+                onClick={() => setShowChangePassword(true)}
+                className="flex items-center gap-1 text-blue-200 hover:text-white hover:bg-blue-900/50 px-3 py-1.5 rounded transition text-xs font-medium border border-transparent hover:border-blue-400"
+                title="Đổi mật khẩu"
+              >
+                <Lock size={14} /> Đổi mật khẩu
+              </button>
+              <div className="h-8 w-px bg-blue-800 mx-1"></div>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-1 text-red-200 hover:text-white hover:bg-red-900/50 px-3 py-1.5 rounded transition text-xs font-medium border border-transparent hover:border-red-400"
+                title="Đăng xuất"
+              >
+                 <LogOut size={14} /> Đăng xuất
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -1323,6 +1369,22 @@ function App() {
           currentUser={currentUser}
           onSubmit={editingRecord ? handleUpdateRecord : handleAddRecord}
           onCancel={() => { setIsFormOpen(false); setEditingRecord(undefined); }}
+        />
+      )}
+
+      {/* User Management Modal */}
+      {showUserManagement && currentUser.role === 'admin' && (
+        <UserManagement 
+          onClose={() => setShowUserManagement(false)} 
+          currentUser={currentUser}
+        />
+      )}
+
+      {/* Change Password Modal */}
+      {showChangePassword && (
+        <ChangePassword 
+          onClose={() => setShowChangePassword(false)} 
+          user={currentUser}
         />
       )}
     </div>

@@ -39,7 +39,15 @@ export type LandRecordFormData = Omit<LandRecord, 'id' | 'createdAt'>;
 export type UserRole = 'admin' | 'subadmin' | 'user';
 
 export interface User {
+  id?: string;
   username: string;
+  name: string;
+  role: UserRole;
+}
+
+export interface UserFormData {
+  username: string;
+  password?: string;
   name: string;
   role: UserRole;
 }
