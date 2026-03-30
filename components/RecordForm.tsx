@@ -142,7 +142,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
       const base64 = await base64Promise;
 
       // 3. Gửi lên Google Apps Script (THAY URL CỦA BẠN VÀO ĐÂY)
-      const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzMrV_Gd2Bk1aMZANZdjvJu8uu_IruG3LFxM_dVqD5swb6_bT8tVmEjkqQ4hgCmxSjWow/exec'; 
+      const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXbQyjKR4_BDAR33LMdxZldWmj7pJY4TDV4D6cLRWBNLP0QTcFKGR_eaOcKojZObNAtQ/exec'; 
       
       const response = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
