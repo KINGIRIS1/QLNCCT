@@ -49,6 +49,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
           <h1 className="text-xl font-bold text-[#003b5c] uppercase text-center leading-tight">
             Hệ Thống <br/> Quản Lý Ngăn Chặn Đất Đai
           </h1>
+          <h2 className="text-md font-bold text-[#003b5c] mt-2 uppercase">Chi nhánh Bình Long</h2>
           <p className="text-gray-500 text-sm mt-2">Đăng nhập hệ thống</p>
         </div>
 
@@ -102,7 +103,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
         </form>
       </div>
       <div className="mt-4 text-xs text-gray-500">
-        © 2024 Cổng thông tin đất đai điện tử
+        © 2026 Cổng thông tin đất đai điện tử
       </div>
     </div>
   );

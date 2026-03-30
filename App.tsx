@@ -819,12 +819,9 @@ function App() {
                <FileText className="text-[#003b5c]" size={24} />
             </div>
             <div>
-              <h1 className="text-lg font-bold uppercase tracking-wide">Hệ Thống Quản Lý Ngăn Chặn Đất Đai</h1>
+              <h1 className="text-lg font-bold tracking-wide">Hệ Thống Quản Lý Ngăn Chặn Đất Đai</h1>
               <div className="flex items-center gap-2">
-                <p className="text-blue-200 text-xs">Sổ theo dõi ngăn chặn & biến động</p>
-                <span className="bg-green-600 text-[10px] px-1.5 py-0.5 rounded text-white font-bold flex items-center gap-1">
-                   Server-Side Pagination <WifiOff size={10} className="hidden"/>
-                </span>
+                <p className="text-blue-200 text-xs">Chi nhánh Bình Long</p>
               </div>
             </div>
           </div>
