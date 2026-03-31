@@ -31,9 +31,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     issueNumber: '',
     certNumber: '',
     issueDate: new Date().toISOString().split('T')[0],
-    area: 0,
-    plotNumber: '',
-    mapSheetNumber: '',
+    plots: [{
+      oldMapSheetNumber: '',
+      newMapSheetNumber: '',
+      oldPlotNumber: '',
+      newPlotNumber: '',
+      oldArea: 0,
+      newArea: 0,
+    }],
     hamlet: '',
     oldCommune: '',
     newCommune: '',
@@ -50,6 +55,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
         ...initialData,
         // Đảm bảo các trường date không bị null/undefined khi load vào form
         issueDate: initialData.issueDate || '',
+        plots: [{
+          oldMapSheetNumber: initialData.oldMapSheetNumber || '',
+          newMapSheetNumber: initialData.newMapSheetNumber || '',
+          oldPlotNumber: initialData.oldPlotNumber || initialData.plotNumber || '',
+          newPlotNumber: initialData.newPlotNumber || '',
+          oldArea: initialData.oldArea || 0,
+          newArea: initialData.newArea || 0,
+        }],
         blockingDocuments: initialData.blockingDocuments.map(d => ({
             ...d,
             date: d.date || ''
@@ -84,6 +97,34 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     if (formData.owners.length > 1) {
       const newOwners = formData.owners.filter((_, i) => i !== index);
       setFormData(prev => ({ ...prev, owners: newOwners }));
+    }
+  };
+
+  // --- Plots Logic ---
+  const handlePlotChange = (index: number, field: keyof PlotData, value: string | number) => {
+    const newPlots = [...formData.plots];
+    newPlots[index] = { ...newPlots[index], [field]: value };
+    setFormData(prev => ({ ...prev, plots: newPlots }));
+  };
+
+  const addPlotField = () => {
+    setFormData(prev => ({
+      ...prev,
+      plots: [...prev.plots, {
+        oldMapSheetNumber: '',
+        newMapSheetNumber: '',
+        oldPlotNumber: '',
+        newPlotNumber: '',
+        oldArea: 0,
+        newArea: 0,
+      }]
+    }));
+  };
+
+  const removePlotField = (index: number) => {
+    if (formData.plots.length > 1) {
+      const newPlots = formData.plots.filter((_, i) => i !== index);
+      setFormData(prev => ({ ...prev, plots: newPlots }));
     }
   };
 
@@ -279,43 +320,94 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
 
             {/* Group 2: Thông tin thửa đất */}
             <div className="bg-white border border-gray-300 shadow-sm rounded-sm">
-                <div className="bg-gray-100 px-4 py-2 border-b border-gray-300 font-bold text-[#003b5c] text-sm uppercase flex items-center gap-2">
-                    <span className="bg-[#003b5c] text-white w-6 h-6 flex items-center justify-center rounded-full text-xs">2</span>
-                    Đặc điểm Thửa Đất
+                <div className="bg-gray-100 px-4 py-2 border-b border-gray-300 font-bold text-[#003b5c] text-sm uppercase flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                        <span className="bg-[#003b5c] text-white w-6 h-6 flex items-center justify-center rounded-full text-xs">2</span>
+                        Đặc điểm Thửa Đất
+                    </div>
+                    <button
+                        type="button"
+                        onClick={addPlotField}
+                        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded border border-blue-200 flex items-center gap-1 transition-colors"
+                    >
+                        <Plus size={12} /> Thêm thửa đất
+                    </button>
                 </div>
-                <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                     <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Tờ bản đồ số</label>
-                        <input
-                            type="text"
-                            name="mapSheetNumber"
-                            value={formData.mapSheetNumber}
-                            onChange={handleChange}
-                            className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none font-medium text-gray-900 bg-white"
-                        />
-                     </div>
-                     <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Thửa đất số</label>
-                        <input
-                            type="text"
-                            name="plotNumber"
-                            value={formData.plotNumber}
-                            onChange={handleChange}
-                            className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none font-medium text-gray-900 bg-white"
-                        />
-                     </div>
-                     <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Diện tích (m²)</label>
-                        <input
-                            type="number"
-                            name="area"
-                            value={formData.area}
-                            onChange={handleChange}
-                            className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none text-gray-900 bg-white"
-                        />
-                     </div>
+                <div className="p-4 space-y-4">
+                     {formData.plots.map((plot, index) => (
+                         <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-start border-b border-gray-200 pb-4 last:border-0 last:pb-0 relative">
+                             {formData.plots.length > 1 && (
+                                 <button
+                                     type="button"
+                                     onClick={() => removePlotField(index)}
+                                     className="absolute -right-2 -top-2 text-red-500 hover:text-red-700 bg-white rounded-full p-1 shadow-sm border border-gray-200"
+                                     title="Xóa thửa đất này"
+                                 >
+                                     <X size={14} />
+                                 </button>
+                             )}
+                             <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Tờ bản đồ cũ</label>
+                                <input
+                                    type="text"
+                                    value={plot.oldMapSheetNumber}
+                                    onChange={(e) => handlePlotChange(index, 'oldMapSheetNumber', e.target.value)}
+                                    placeholder="VD: 1"
+                                    className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none font-medium text-gray-900 bg-white"
+                                />
+                             </div>
+                             <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Tờ bản đồ mới</label>
+                                <input
+                                    type="text"
+                                    value={plot.newMapSheetNumber}
+                                    onChange={(e) => handlePlotChange(index, 'newMapSheetNumber', e.target.value)}
+                                    placeholder="VD: 4"
+                                    className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none font-medium text-gray-900 bg-white"
+                                />
+                             </div>
+                             <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Thửa đất cũ</label>
+                                <input
+                                    type="text"
+                                    value={plot.oldPlotNumber}
+                                    onChange={(e) => handlePlotChange(index, 'oldPlotNumber', e.target.value)}
+                                    placeholder="VD: 12"
+                                    className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none font-medium text-gray-900 bg-white"
+                                />
+                             </div>
+                             <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Thửa đất mới</label>
+                                <input
+                                    type="text"
+                                    value={plot.newPlotNumber}
+                                    onChange={(e) => handlePlotChange(index, 'newPlotNumber', e.target.value)}
+                                    placeholder="VD: 15"
+                                    className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none font-medium text-gray-900 bg-white"
+                                />
+                             </div>
+                             <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Diện tích cũ (m²)</label>
+                                <input
+                                    type="number"
+                                    value={plot.oldArea || ''}
+                                    onChange={(e) => handlePlotChange(index, 'oldArea', Number(e.target.value))}
+                                    className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none text-gray-900 bg-white"
+                                />
+                             </div>
+                             <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Diện tích mới (m²)</label>
+                                <input
+                                    type="number"
+                                    value={plot.newArea || ''}
+                                    onChange={(e) => handlePlotChange(index, 'newArea', Number(e.target.value))}
+                                    className="w-full border border-gray-300 px-3 py-2 text-sm rounded-sm focus:border-blue-600 outline-none text-gray-900 bg-white"
+                                />
+                             </div>
+                         </div>
+                     ))}
 
-                     <div className="md:col-span-3 grid grid-cols-3 gap-3">
+                     <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-200">
                          <div className="col-span-1">
                             <label className="block text-xs font-semibold text-gray-600 mb-1">Ấp/Khu phố</label>
                             <input

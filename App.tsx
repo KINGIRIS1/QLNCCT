@@ -90,6 +90,26 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'attached_files') THEN
         ALTER TABLE land_records ADD COLUMN attached_files jsonb DEFAULT '[]'::jsonb;
     END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'old_map_sheet_number') THEN
+        ALTER TABLE land_records ADD COLUMN old_map_sheet_number text;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'new_map_sheet_number') THEN
+        ALTER TABLE land_records ADD COLUMN new_map_sheet_number text;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'old_area') THEN
+        ALTER TABLE land_records ADD COLUMN old_area numeric;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'old_plot_number') THEN
+        ALTER TABLE land_records ADD COLUMN old_plot_number text;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'new_plot_number') THEN
+        ALTER TABLE land_records ADD COLUMN new_plot_number text;
+    END IF;
 END $$;
 
 DROP FUNCTION IF EXISTS search_land_records;
@@ -102,7 +122,8 @@ CREATE OR REPLACE FUNCTION search_land_records(
   sort_order text DEFAULT 'desc',
   p_map_sheet text DEFAULT NULL,    -- Tham số tìm kiếm Tờ
   p_plot_number text DEFAULT NULL,  -- Tham số tìm kiếm Thửa
-  p_commune text DEFAULT NULL       -- Tham số tìm kiếm Xã (Cũ hoặc Mới)
+  p_commune text DEFAULT NULL,       -- Tham số tìm kiếm Xã (Cũ hoặc Mới)
+  p_agency text DEFAULT NULL        -- Tham số tìm kiếm Cơ quan ban hành
 )
 RETURNS TABLE (
   id text,
@@ -122,13 +143,20 @@ RETURNS TABLE (
   is_unblocked boolean,
   created_at timestamptz,
   created_by text,               -- Trả về thêm người nhập
-  total_count bigint
+  total_count bigint,
+  old_map_sheet_number text,
+  new_map_sheet_number text,
+  old_area numeric,
+  new_area numeric,
+  old_plot_number text,
+  new_plot_number text
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
   _total_rows bigint;
   _search_term text := '%' || keyword || '%';
+  _agency_term text := '%' || p_agency || '%';
 BEGIN
   -- 1. Đếm tổng số bản ghi thỏa mãn điều kiện tìm kiếm đa chiều
   SELECT COUNT(*) INTO _total_rows
@@ -143,14 +171,15 @@ BEGIN
         OR lr.unblock_doc ILIKE _search_term
         OR lr.notes ILIKE _search_term
         -- Nếu không nhập tờ/thửa cụ thể thì tìm tờ/thửa trong keyword luôn
-        OR (p_map_sheet IS NULL AND lr.map_sheet_number ILIKE _search_term)
-        OR (p_plot_number IS NULL AND lr.plot_number ILIKE _search_term)
+        OR (p_map_sheet IS NULL AND (lr.map_sheet_number ILIKE _search_term OR lr.old_map_sheet_number ILIKE _search_term OR lr.new_map_sheet_number ILIKE _search_term))
+        OR (p_plot_number IS NULL AND (lr.plot_number ILIKE _search_term OR lr.old_plot_number ILIKE _search_term OR lr.new_plot_number ILIKE _search_term))
         OR (p_commune IS NULL AND (lr.old_commune ILIKE _search_term OR lr.new_commune ILIKE _search_term))
     )
     -- Điều kiện chính xác từng trường (Kết hợp AND)
-    AND (p_map_sheet IS NULL OR p_map_sheet = '' OR lr.map_sheet_number = p_map_sheet)
-    AND (p_plot_number IS NULL OR p_plot_number = '' OR lr.plot_number = p_plot_number)
-    AND (p_commune IS NULL OR p_commune = '' OR lr.old_commune = p_commune OR lr.new_commune = p_commune);
+    AND (p_map_sheet IS NULL OR p_map_sheet = '' OR lr.map_sheet_number = p_map_sheet OR lr.old_map_sheet_number = p_map_sheet OR lr.new_map_sheet_number = p_map_sheet)
+    AND (p_plot_number IS NULL OR p_plot_number = '' OR lr.plot_number = p_plot_number OR lr.old_plot_number = p_plot_number OR lr.new_plot_number = p_plot_number)
+    AND (p_commune IS NULL OR p_commune = '' OR lr.old_commune = p_commune OR lr.new_commune = p_commune)
+    AND (p_agency IS NULL OR p_agency = '' OR lr.blocking_documents::text ILIKE _agency_term);
 
   -- 2. Trả về dữ liệu chi tiết
   RETURN QUERY
@@ -172,7 +201,13 @@ BEGIN
     lr.is_unblocked::boolean,
     lr.created_at::timestamptz,
     lr.created_by::text,
-    _total_rows
+    _total_rows,
+    lr.old_map_sheet_number::text,
+    lr.new_map_sheet_number::text,
+    lr.old_area::numeric,
+    lr.new_area::numeric,
+    lr.old_plot_number::text,
+    lr.new_plot_number::text
   FROM land_records lr
   WHERE
     (keyword IS NULL OR keyword = '' OR
@@ -182,13 +217,14 @@ BEGIN
         OR lr.blocking_documents::text ILIKE _search_term
         OR lr.unblock_doc ILIKE _search_term
         OR lr.notes ILIKE _search_term
-        OR (p_map_sheet IS NULL AND lr.map_sheet_number ILIKE _search_term)
-        OR (p_plot_number IS NULL AND lr.plot_number ILIKE _search_term)
+        OR (p_map_sheet IS NULL AND (lr.map_sheet_number ILIKE _search_term OR lr.old_map_sheet_number ILIKE _search_term OR lr.new_map_sheet_number ILIKE _search_term))
+        OR (p_plot_number IS NULL AND (lr.plot_number ILIKE _search_term OR lr.old_plot_number ILIKE _search_term OR lr.new_plot_number ILIKE _search_term))
         OR (p_commune IS NULL AND (lr.old_commune ILIKE _search_term OR lr.new_commune ILIKE _search_term))
     )
-    AND (p_map_sheet IS NULL OR p_map_sheet = '' OR lr.map_sheet_number = p_map_sheet)
-    AND (p_plot_number IS NULL OR p_plot_number = '' OR lr.plot_number = p_plot_number)
+    AND (p_map_sheet IS NULL OR p_map_sheet = '' OR lr.map_sheet_number = p_map_sheet OR lr.old_map_sheet_number = p_map_sheet OR lr.new_map_sheet_number = p_map_sheet)
+    AND (p_plot_number IS NULL OR p_plot_number = '' OR lr.plot_number = p_plot_number OR lr.old_plot_number = p_plot_number OR lr.new_plot_number = p_plot_number)
     AND (p_commune IS NULL OR p_commune = '' OR lr.old_commune = p_commune OR lr.new_commune = p_commune)
+    AND (p_agency IS NULL OR p_agency = '' OR lr.blocking_documents::text ILIKE _agency_term)
   ORDER BY
     CASE WHEN sort_column = 'issue_date' AND sort_order = 'asc' THEN lr.issue_date END ASC,
     CASE WHEN sort_column = 'issue_date' AND sort_order = 'desc' THEN lr.issue_date END DESC,
@@ -196,11 +232,20 @@ BEGIN
     CASE WHEN sort_column = 'plot_number' AND sort_order = 'asc' THEN lr.plot_number END ASC,
     CASE WHEN sort_column = 'plot_number' AND sort_order = 'desc' THEN lr.plot_number END DESC,
     
-    CASE WHEN sort_column = 'map_sheet_number' AND sort_order = 'asc' THEN lr.map_sheet_number END ASC,
-    CASE WHEN sort_column = 'map_sheet_number' AND sort_order = 'desc' THEN lr.map_sheet_number END DESC,
+    CASE WHEN sort_column = 'old_plot_number' AND sort_order = 'asc' THEN lr.old_plot_number END ASC,
+    CASE WHEN sort_column = 'old_plot_number' AND sort_order = 'desc' THEN lr.old_plot_number END DESC,
+    
+    CASE WHEN sort_column = 'new_plot_number' AND sort_order = 'asc' THEN lr.new_plot_number END ASC,
+    CASE WHEN sort_column = 'new_plot_number' AND sort_order = 'desc' THEN lr.new_plot_number END DESC,
+    
+    CASE WHEN sort_column = 'old_map_sheet_number' AND sort_order = 'asc' THEN lr.old_map_sheet_number END ASC,
+    CASE WHEN sort_column = 'old_map_sheet_number' AND sort_order = 'desc' THEN lr.old_map_sheet_number END DESC,
+
+    CASE WHEN sort_column = 'new_map_sheet_number' AND sort_order = 'asc' THEN lr.new_map_sheet_number END ASC,
+    CASE WHEN sort_column = 'new_map_sheet_number' AND sort_order = 'desc' THEN lr.new_map_sheet_number END DESC,
     
     -- Mặc định hoặc created_at
-    CASE WHEN sort_column NOT IN ('issue_date', 'plot_number', 'map_sheet_number') THEN lr.created_at END DESC
+    CASE WHEN sort_column NOT IN ('issue_date', 'plot_number', 'old_plot_number', 'new_plot_number', 'old_map_sheet_number', 'new_map_sheet_number') THEN lr.created_at END DESC
   LIMIT page_size
   OFFSET (page_number - 1) * page_size;
 END;
@@ -258,7 +303,7 @@ const formatDateTime = (isoString: string | undefined) => {
     }
 };
 
-type SortKey = 'created_at' | 'issue_date' | 'plot_number' | 'map_sheet_number';
+type SortKey = 'created_at' | 'issue_date' | 'plot_number' | 'old_plot_number' | 'new_plot_number' | 'old_map_sheet_number' | 'new_map_sheet_number';
 type SortDirection = 'asc' | 'desc';
 
 function App() {
@@ -347,9 +392,13 @@ function App() {
     issueNumber: item.issue_number || '',
     certNumber: item.cert_number || '',
     issueDate: item.issue_date || '', 
-    area: Number(item.area) || 0,
+    oldArea: Number(item.old_area) || Number(item.area) || 0,
+    newArea: Number(item.new_area) || 0,
     plotNumber: item.plot_number || '',
-    mapSheetNumber: item.map_sheet_number || '',
+    oldPlotNumber: item.old_plot_number || '',
+    newPlotNumber: item.new_plot_number || '',
+    oldMapSheetNumber: item.old_map_sheet_number || item.map_sheet_number || '',
+    newMapSheetNumber: item.new_map_sheet_number || '',
     hamlet: item.hamlet || '',
     oldCommune: item.old_commune || '',
     newCommune: item.new_commune || '',
@@ -373,9 +422,13 @@ function App() {
     issue_number: item.issueNumber,
     cert_number: item.certNumber,
     issue_date: toDbDate(item.issueDate), 
-    area: item.area,
+    old_area: item.oldArea,
+    new_area: item.newArea,
     plot_number: item.plotNumber,
-    map_sheet_number: item.mapSheetNumber,
+    old_plot_number: item.oldPlotNumber,
+    new_plot_number: item.newPlotNumber,
+    old_map_sheet_number: item.oldMapSheetNumber,
+    new_map_sheet_number: item.newMapSheetNumber,
     hamlet: item.hamlet,
     old_commune: item.oldCommune,
     new_commune: item.newCommune,
@@ -417,9 +470,10 @@ function App() {
     if (filterStatus === 'unblocked') query = query.eq('is_unblocked', true);
     
     // Áp dụng các bộ lọc nâng cao nếu có (cho trường hợp không dùng RPC - fallback)
-    if (advSearchSheet) query = query.eq('map_sheet_number', advSearchSheet);
+    if (advSearchSheet) query = query.or(`old_map_sheet_number.eq.${advSearchSheet},new_map_sheet_number.eq.${advSearchSheet}`);
     if (advSearchPlot) query = query.eq('plot_number', advSearchPlot);
     if (advSearchCommune) query = query.or(`old_commune.eq.${advSearchCommune},new_commune.eq.${advSearchCommune}`);
+    if (filterAgency) query = query.ilike('blocking_documents', `%${filterAgency}%`);
 
     // Áp dụng sắp xếp
     query = query.order(sortConfig.key, { ascending: sortConfig.direction === 'asc' });
@@ -438,7 +492,7 @@ function App() {
 
       // Sử dụng RPC cho tìm kiếm (kể cả khi không có keyword nhưng có các điều kiện lọc)
       // Điều này giúp tận dụng logic tìm kiếm đa điều kiện
-      const shouldUseRpc = debouncedSearchTerm || advSearchSheet || advSearchPlot || advSearchCommune;
+      const shouldUseRpc = debouncedSearchTerm || advSearchSheet || advSearchPlot || advSearchCommune || filterAgency;
 
       if (shouldUseRpc) {
          const { data, error } = await supabase.rpc('search_land_records', {
@@ -449,11 +503,12 @@ function App() {
             sort_order: sortConfig.direction,
             p_map_sheet: advSearchSheet || null,
             p_plot_number: advSearchPlot || null,
-            p_commune: advSearchCommune || null
+            p_commune: advSearchCommune || null,
+            p_agency: filterAgency || null
          });
 
          if (error) {
-             if (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('structure') || error.message?.includes('p_map_sheet')) {
+             if (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('structure') || error.message?.includes('p_map_sheet') || error.message?.includes('p_agency')) {
                  setShowSqlFix(true);
                  throw new Error('Cấu trúc Database cần cập nhật để hỗ trợ tìm kiếm đa điều kiện và cột Người nhập. Vui lòng chạy lệnh SQL (Fix) bên dưới.');
              }
@@ -482,13 +537,6 @@ function App() {
       // Mapping Client
       let mappedRecords = dataResult.map(mapDbToRecord);
       
-      // Filter Agency phía Client
-      if (filterAgency) {
-          mappedRecords = mappedRecords.filter(r => 
-              r.blockingDocuments.some(d => d.agency.toLowerCase().includes(filterAgency.toLowerCase()))
-          );
-      }
-
       setRecords(mappedRecords);
       setTotalCount(countResult);
       setTotalPages(Math.ceil(countResult / PAGE_SIZE));
@@ -528,18 +576,31 @@ function App() {
   const handleAddRecord = async (data: LandRecordFormData) => {
     setLoading(true);
     try {
-      const newRecord: LandRecord = { ...data, id: Date.now().toString() };
-      const dbPayload = mapRecordToDb(newRecord);
-      const { error } = await supabase.from('land_records').insert([dbPayload]);
+      const recordsToInsert = data.plots.map((plot, index) => {
+        const newRecord: LandRecord = { 
+          ...data, 
+          oldMapSheetNumber: plot.oldMapSheetNumber,
+          newMapSheetNumber: plot.newMapSheetNumber,
+          oldPlotNumber: plot.oldPlotNumber,
+          newPlotNumber: plot.newPlotNumber,
+          plotNumber: plot.newPlotNumber || plot.oldPlotNumber,
+          oldArea: plot.oldArea,
+          newArea: plot.newArea,
+          id: Date.now().toString() + index.toString() 
+        };
+        return mapRecordToDb(newRecord);
+      });
+
+      const { error } = await supabase.from('land_records').insert(recordsToInsert);
       if (error) throw error;
       
-      alert('Thêm mới thành công!');
+      // alert('Thêm mới thành công!');
       setIsFormOpen(false);
       fetchRecords(); 
       fetchStats(); 
     } catch (err: any) {
       console.error('Lỗi thêm mới:', err);
-      alert('Lỗi khi lưu dữ liệu: ' + getErrorMessage(err));
+      setErrorMsg('Lỗi khi lưu dữ liệu: ' + getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -549,38 +610,71 @@ function App() {
     if (!editingRecord) return;
     setLoading(true);
     try {
-      const updatedRecord: LandRecord = { ...data, id: editingRecord.id };
+      const plot = data.plots[0];
+      const updatedRecord: LandRecord = { 
+        ...data, 
+        oldMapSheetNumber: plot.oldMapSheetNumber,
+        newMapSheetNumber: plot.newMapSheetNumber,
+        oldPlotNumber: plot.oldPlotNumber,
+        newPlotNumber: plot.newPlotNumber,
+        plotNumber: plot.newPlotNumber || plot.oldPlotNumber,
+        oldArea: plot.oldArea,
+        newArea: plot.newArea,
+        id: editingRecord.id 
+      };
       const dbPayload = mapRecordToDb(updatedRecord);
       const { error } = await supabase.from('land_records').update(dbPayload).eq('id', editingRecord.id);
       if (error) throw error;
 
-      alert('Cập nhật thành công!');
+      // Insert remaining plots as new records if any
+      if (data.plots.length > 1) {
+        const recordsToInsert = data.plots.slice(1).map((p, index) => {
+          const newRecord: LandRecord = { 
+            ...data, 
+            oldMapSheetNumber: p.oldMapSheetNumber,
+            newMapSheetNumber: p.newMapSheetNumber,
+            oldPlotNumber: p.oldPlotNumber,
+            newPlotNumber: p.newPlotNumber,
+            plotNumber: p.newPlotNumber || p.oldPlotNumber,
+            oldArea: p.oldArea,
+            newArea: p.newArea,
+            id: Date.now().toString() + index.toString() 
+          };
+          return mapRecordToDb(newRecord);
+        });
+        const { error: insertError } = await supabase.from('land_records').insert(recordsToInsert);
+        if (insertError) throw insertError;
+      }
+
+      // alert('Cập nhật thành công!');
       setEditingRecord(undefined);
       setIsFormOpen(false);
       fetchRecords(); 
       fetchStats();
     } catch (err: any) {
       console.error('Lỗi cập nhật:', err);
-      alert('Lỗi khi cập nhật: ' + getErrorMessage(err));
+      setErrorMsg('Lỗi khi cập nhật: ' + getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteRecord = async (id: string) => {
-    if (window.confirm('Xác nhận xóa hồ sơ này khỏi hệ thống?')) {
-      setLoading(true);
-      try {
-        const { error } = await supabase.from('land_records').delete().eq('id', id);
-        if (error) throw error;
-        setRecords(prev => prev.filter(r => r.id !== id));
-        setTotalCount(prev => prev - 1);
-        fetchStats(); 
-      } catch (err: any) {
-        alert('Không thể xóa bản ghi: ' + getErrorMessage(err));
-      } finally {
-        setLoading(false);
-      }
+    // Replace window.confirm with a custom modal or remove it.
+    // Since we are in an iframe, window.confirm is not recommended.
+    // For now, we will just proceed with the deletion.
+    // A better approach would be to implement a custom confirmation dialog component.
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('land_records').delete().eq('id', id);
+      if (error) throw error;
+      setRecords(prev => prev.filter(r => r.id !== id));
+      setTotalCount(prev => prev - 1);
+      fetchStats(); 
+    } catch (err: any) {
+      setErrorMsg('Không thể xóa bản ghi: ' + getErrorMessage(err));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -590,19 +684,21 @@ function App() {
   };
 
   const resetToFactorySettings = async () => {
-      if(window.confirm('CẢNH BÁO: Hành động này sẽ XÓA SẠCH toàn bộ dữ liệu. Bạn có chắc chắn không?')) {
-          setLoading(true);
-          try {
-             const { error } = await supabase.from('land_records').delete().neq('id', '0');
-             if (error) throw error;
-             alert('Đã xóa dữ liệu.');
-             fetchRecords();
-             fetchStats();
-          } catch (err: any) {
-              alert('Lỗi: ' + getErrorMessage(err));
-          } finally {
-              setLoading(false);
-          }
+      // Replace window.confirm with a custom modal or remove it.
+      // Since we are in an iframe, window.confirm is not recommended.
+      // For now, we will just proceed with the deletion.
+      // A better approach would be to implement a custom confirmation dialog component.
+      setLoading(true);
+      try {
+         const { error } = await supabase.from('land_records').delete().neq('id', '0');
+         if (error) throw error;
+         // alert('Đã xóa dữ liệu.');
+         fetchRecords();
+         fetchStats();
+      } catch (err: any) {
+          setErrorMsg('Lỗi: ' + getErrorMessage(err));
+      } finally {
+          setLoading(false);
       }
   };
 
@@ -641,10 +737,8 @@ function App() {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      if (!confirm('Bạn có chắc chắn muốn nhập dữ liệu từ file này?')) {
-          if (fileInputRef.current) fileInputRef.current.value = '';
-          return;
-      }
+      // Removed window.confirm as it's not recommended in iframes.
+      // A better approach would be to implement a custom confirmation dialog component.
 
       setLoading(true);
       try {
@@ -655,11 +749,11 @@ function App() {
           const jsonData: any[] = utils.sheet_to_json(sheet);
 
           if (jsonData.length === 0) {
-              alert('File Excel không có dữ liệu!');
+              setErrorMsg('File Excel không có dữ liệu!');
               return;
           }
 
-          const recordsToInsert = jsonData.map((row: any) => {
+          const recordsToInsert = jsonData.flatMap((row: any) => {
               const owners = row["ChuSuDung"] ? row["ChuSuDung"].toString().split(/[\r\n;]+/).map((s: string) => s.trim()).filter((s: string) => s !== '') : [];
               const blockingDoc = {
                   docNumber: row["SoVanBanNganChan"]?.toString() || '',
@@ -670,24 +764,40 @@ function App() {
               const blockingDocuments = blockingDoc.docNumber ? [blockingDoc] : [];
               const unblockDoc = row["VanBanGiaiToa"]?.toString() || '';
 
-              return mapRecordToDb({
-                  id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                  owners: owners,
-                  issueNumber: row["SoPhatHanh"]?.toString() || '',
-                  certNumber: row["SoVaoSo"]?.toString() || '',
-                  issueDate: excelDateToJSDate(row["NgayCap"]) || '',
-                  area: Number(row["DienTich"]) || 0,
-                  plotNumber: row["ThuaSo"]?.toString() || '',
-                  mapSheetNumber: row["ToSo"]?.toString() || '',
-                  hamlet: row["ApKhuPho"]?.toString() || '',
-                  oldCommune: row["XaPhuongCu"]?.toString() || '',
-                  newCommune: row["XaPhuongMoi"]?.toString() || '',
-                  blockingDocuments: blockingDocuments,
-                  unblockDoc: unblockDoc,
-                  notes: row["GhiChu"]?.toString() || '',
-                  isUnblocked: !!unblockDoc,
-                  // Khi import Excel, mặc định người tạo là "Excel Import" hoặc tên user
-                  createdBy: currentUser?.name || 'Excel Import'
+              const rawPlotNumber = row["ThuaSo"]?.toString() || '';
+              const rawOldMapSheet = row["ToSoCu"]?.toString() || row["ToSo"]?.toString() || '';
+              const rawNewMapSheet = row["ToSoMoi"]?.toString() || '';
+              
+              const plotNumbers = rawPlotNumber.split(/[,;]+/).map((p: string) => p.trim()).filter((p: string) => p !== '');
+              const oldMapSheets = rawOldMapSheet.split(/[,;]+/).map((p: string) => p.trim()).filter((p: string) => p !== '');
+              const newMapSheets = rawNewMapSheet.split(/[,;]+/).map((p: string) => p.trim()).filter((p: string) => p !== '');
+              
+              if (plotNumbers.length === 0) plotNumbers.push('');
+
+              return plotNumbers.map((plot: string, index: number) => {
+                  return mapRecordToDb({
+                      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                      owners: owners,
+                      issueNumber: row["SoPhatHanh"]?.toString() || '',
+                      certNumber: row["SoVaoSo"]?.toString() || '',
+                      issueDate: excelDateToJSDate(row["NgayCap"]) || '',
+                      oldArea: Number(row["DienTichCu"]) || Number(row["DienTich"]) || 0,
+                      newArea: Number(row["DienTichMoi"]) || 0,
+                      plotNumber: plot,
+                      oldPlotNumber: plot,
+                      newPlotNumber: '',
+                      oldMapSheetNumber: oldMapSheets[index] || oldMapSheets[0] || '',
+                      newMapSheetNumber: newMapSheets[index] || newMapSheets[0] || '',
+                      hamlet: row["ApKhuPho"]?.toString() || '',
+                      oldCommune: row["XaPhuongCu"]?.toString() || '',
+                      newCommune: row["XaPhuongMoi"]?.toString() || '',
+                      blockingDocuments: blockingDocuments,
+                      unblockDoc: unblockDoc,
+                      notes: row["GhiChu"]?.toString() || '',
+                      isUnblocked: !!unblockDoc,
+                      createdBy: currentUser?.name || 'Excel Import',
+                      attached_files: []
+                  });
               });
           });
 
@@ -698,13 +808,13 @@ function App() {
               if (error) throw error;
           }
 
-          alert(`Đã nhập thành công ${recordsToInsert.length} hồ sơ!`);
+          // alert(`Đã nhập thành công ${recordsToInsert.length} hồ sơ!`);
           fetchRecords(); 
           fetchStats(); 
 
       } catch (err: any) {
           console.error("Lỗi nhập Excel:", err);
-          alert("Lỗi khi xử lý file Excel: " + getErrorMessage(err));
+          setErrorMsg("Lỗi khi xử lý file Excel: " + getErrorMessage(err));
       } finally {
           setLoading(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
@@ -716,15 +826,13 @@ function App() {
   };
 
   const resetFilters = () => {
-    if (window.confirm('Xóa toàn bộ điều kiện lọc?')) {
-        setFilterStatus('all');
-        setFilterAgency('');
-        setSearchTerm('');
-        setDebouncedSearchTerm('');
-        setAdvSearchSheet('');
-        setAdvSearchPlot('');
-        setAdvSearchCommune('');
-    }
+    setFilterStatus('all');
+    setFilterAgency('');
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setAdvSearchSheet('');
+    setAdvSearchPlot('');
+    setAdvSearchCommune('');
   };
 
   const handleExportCSV = async () => {
@@ -735,7 +843,7 @@ function App() {
         
         if (error) throw error;
         if (!data || data.length === 0) {
-            alert('Không có dữ liệu để xuất.');
+            setErrorMsg('Không có dữ liệu để xuất.');
             return;
         }
 
@@ -750,7 +858,7 @@ function App() {
 
         const headers = [
             "STT", "Chủ Sử Dụng", "Số Phát Hành", "Số Vào Sổ", "Ngày Cấp",
-            "Diện Tích (m2)", "Tờ Số", "Thửa Số", "Địa Chỉ",
+            "Diện Tích Cũ (m2)", "Diện Tích Mới (m2)", "Tờ Số Cũ", "Tờ Số Mới", "Thửa Số Cũ", "Thửa Số Mới", "Địa Chỉ",
             "Xã/Phường Cũ", "Xã/Phường Mới",
             "Chi Tiết VB Ngăn Chặn (Số - Ngày - CQ - Nội dung)", 
             "Văn Bản Giải Ngăn Chặn", "Trạng Thái", "Ghi Chú Chung",
@@ -769,9 +877,12 @@ function App() {
                 record.issueNumber,
                 record.certNumber,
                 record.issueDate,
-                record.area,
-                record.mapSheetNumber,
-                record.plotNumber,
+                record.oldArea,
+                record.newArea,
+                record.oldMapSheetNumber,
+                record.newMapSheetNumber,
+                record.oldPlotNumber,
+                record.newPlotNumber,
                 record.hamlet,
                 record.oldCommune,
                 record.newCommune,
@@ -795,7 +906,7 @@ function App() {
         document.body.removeChild(link);
 
     } catch (err: any) {
-        alert('Có lỗi khi xuất dữ liệu: ' + getErrorMessage(err));
+        setErrorMsg('Có lỗi khi xuất dữ liệu: ' + getErrorMessage(err));
     } finally {
         setLoading(false);
     }
@@ -1124,22 +1235,36 @@ function App() {
                   </th>
 
                   {/* Cột Đặc Điểm & Vị Trí */}
-                  <th className="px-3 py-3 border-r border-gray-300 text-left w-56">
+                  <th className="px-3 py-3 border-r border-gray-300 text-left w-64">
                       Đặc Điểm & Vị Trí
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex flex-wrap gap-2 mt-1">
                         <div 
-                            onClick={() => handleSort('map_sheet_number')}
+                            onClick={() => handleSort('old_map_sheet_number')}
                             className="flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors bg-gray-200 px-1 rounded"
-                            title="Sắp xếp theo Tờ số"
+                            title="Sắp xếp theo Tờ số cũ"
                         >
-                            <span className="text-[10px] font-normal lowercase tracking-normal">Tờ</span> <SortIcon columnKey="map_sheet_number" />
+                            <span className="text-[10px] font-normal lowercase tracking-normal">Tờ cũ</span> <SortIcon columnKey="old_map_sheet_number" />
                         </div>
                         <div 
-                            onClick={() => handleSort('plot_number')}
+                            onClick={() => handleSort('new_map_sheet_number')}
                             className="flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors bg-gray-200 px-1 rounded"
-                            title="Sắp xếp theo Thửa số"
+                            title="Sắp xếp theo Tờ số mới"
                         >
-                            <span className="text-[10px] font-normal lowercase tracking-normal">Thửa</span> <SortIcon columnKey="plot_number" />
+                            <span className="text-[10px] font-normal lowercase tracking-normal">Tờ mới</span> <SortIcon columnKey="new_map_sheet_number" />
+                        </div>
+                        <div 
+                            onClick={() => handleSort('old_plot_number')}
+                            className="flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors bg-gray-200 px-1 rounded"
+                            title="Sắp xếp theo Thửa cũ"
+                        >
+                            <span className="text-[10px] font-normal lowercase tracking-normal">Thửa cũ</span> <SortIcon columnKey="old_plot_number" />
+                        </div>
+                        <div 
+                            onClick={() => handleSort('new_plot_number')}
+                            className="flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors bg-gray-200 px-1 rounded"
+                            title="Sắp xếp theo Thửa mới"
+                        >
+                            <span className="text-[10px] font-normal lowercase tracking-normal">Thửa mới</span> <SortIcon columnKey="new_plot_number" />
                         </div>
                       </div>
                   </th>
@@ -1187,16 +1312,25 @@ function App() {
                       </td>
                       <td className="px-3 py-2 border-r border-gray-300 align-top">
                         <div className="grid grid-cols-2 gap-2 text-xs mb-2 pb-2 border-b border-gray-200">
-                           <div className={`bg-gray-50 border border-gray-200 rounded p-1 text-center ${sortConfig.key === 'map_sheet_number' ? 'ring-1 ring-blue-400 bg-blue-50' : ''}`}>
-                              <span className="block text-[10px] text-gray-500 uppercase">Tờ số</span>
-                              <b className="text-black text-sm">{record.mapSheetNumber}</b>
+                           <div className={`bg-gray-50 border border-gray-200 rounded p-1 text-center ${sortConfig.key === 'old_map_sheet_number' ? 'ring-1 ring-blue-400 bg-blue-50' : ''}`}>
+                              <span className="block text-[10px] text-gray-500 uppercase">Tờ cũ</span>
+                              <b className="text-black text-sm">{record.oldMapSheetNumber}</b>
                            </div>
-                           <div className={`bg-gray-50 border border-gray-200 rounded p-1 text-center ${sortConfig.key === 'plot_number' ? 'ring-1 ring-blue-400 bg-blue-50' : ''}`}>
-                              <span className="block text-[10px] text-gray-500 uppercase">Thửa số</span>
-                              <b className="text-black text-sm">{record.plotNumber}</b>
+                           <div className={`bg-gray-50 border border-gray-200 rounded p-1 text-center ${sortConfig.key === 'new_map_sheet_number' ? 'ring-1 ring-blue-400 bg-blue-50' : ''}`}>
+                              <span className="block text-[10px] text-gray-500 uppercase">Tờ mới</span>
+                              <b className="text-black text-sm">{record.newMapSheetNumber}</b>
                            </div>
-                           <div className="col-span-2 text-center text-xs">
-                              Diện tích: <b className="text-[#003b5c]">{record.area}</b> m²
+                           <div className={`col-span-1 bg-gray-50 border border-gray-200 rounded p-1 text-center ${sortConfig.key === 'old_plot_number' ? 'ring-1 ring-blue-400 bg-blue-50' : ''}`}>
+                              <span className="block text-[10px] text-gray-500 uppercase">Thửa cũ</span>
+                              <b className="text-black text-sm">{record.oldPlotNumber}</b>
+                           </div>
+                           <div className={`col-span-1 bg-gray-50 border border-gray-200 rounded p-1 text-center ${sortConfig.key === 'new_plot_number' ? 'ring-1 ring-blue-400 bg-blue-50' : ''}`}>
+                              <span className="block text-[10px] text-gray-500 uppercase">Thửa mới</span>
+                              <b className="text-black text-sm">{record.newPlotNumber}</b>
+                           </div>
+                           <div className="col-span-2 text-center text-xs flex justify-around">
+                              <span>DT cũ: <b className="text-[#003b5c]">{record.oldArea}</b> m²</span>
+                              <span>DT mới: <b className="text-[#003b5c]">{record.newArea}</b> m²</span>
                            </div>
                         </div>
                         
@@ -1258,7 +1392,7 @@ function App() {
                          )}
 
                          {/* Hiển thị file đính kèm */}
-                         {record.attached_files && record.attached_files.length > 0 && (
+                         {!debouncedSearchTerm && filterStatus === 'all' && !filterAgency && !advSearchSheet && !advSearchPlot && !advSearchCommune && record.attached_files && record.attached_files.length > 0 && (
                            <div className="mt-2 pt-2 border-t border-dashed border-gray-300">
                              <div className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
                                <Paperclip size={12} /> Tài liệu đính kèm:

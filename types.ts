@@ -19,9 +19,13 @@ export interface LandRecord {
   issueNumber: string; // Số phát hành (Serial sổ đỏ)
   certNumber: string; // Số vào sổ cấp giấy
   issueDate: string; // Ngày cấp
-  area: number; // Diện tích (m2)
+  oldArea: number; // Diện tích cũ (m2)
+  newArea: number; // Diện tích mới (m2)
   plotNumber: string; // Số thửa
-  mapSheetNumber: string; // Số tờ
+  oldPlotNumber: string; // Số thửa cũ
+  newPlotNumber: string; // Số thửa mới
+  oldMapSheetNumber: string; // Số tờ cũ
+  newMapSheetNumber: string; // Số tờ mới
   hamlet: string; // Ấp/Khu phố
   oldCommune: string; // Xã/Phường trước sát nhập
   newCommune: string; // Xã/Phường sau sát nhập
@@ -41,8 +45,19 @@ export interface LandRecord {
   attached_files?: AttachedFile[];
 }
 
-// Kiểu dữ liệu cho Form (không có ID vì ID tự sinh)
-export type LandRecordFormData = Omit<LandRecord, 'id' | 'createdAt'>;
+export interface PlotData {
+  oldMapSheetNumber: string;
+  newMapSheetNumber: string;
+  oldPlotNumber: string;
+  newPlotNumber: string;
+  oldArea: number;
+  newArea: number;
+}
+
+// Kiểu dữ liệu cho Form
+export interface LandRecordFormData extends Omit<LandRecord, 'id' | 'createdAt' | 'oldArea' | 'newArea' | 'plotNumber' | 'oldPlotNumber' | 'newPlotNumber' | 'oldMapSheetNumber' | 'newMapSheetNumber'> {
+  plots: PlotData[];
+}
 
 // Định nghĩa Role và User
 export type UserRole = 'admin' | 'subadmin' | 'user';
