@@ -103,6 +103,10 @@ BEGIN
         ALTER TABLE land_records ADD COLUMN old_area numeric;
     END IF;
 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'new_area') THEN
+        ALTER TABLE land_records ADD COLUMN new_area numeric;
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'old_plot_number') THEN
         ALTER TABLE land_records ADD COLUMN old_plot_number text;
     END IF;
@@ -395,7 +399,7 @@ function App() {
     oldArea: Number(item.old_area) || Number(item.area) || 0,
     newArea: Number(item.new_area) || 0,
     plotNumber: item.plot_number || '',
-    oldPlotNumber: item.old_plot_number || '',
+    oldPlotNumber: item.old_plot_number || item.plot_number || '',
     newPlotNumber: item.new_plot_number || '',
     oldMapSheetNumber: item.old_map_sheet_number || item.map_sheet_number || '',
     newMapSheetNumber: item.new_map_sheet_number || '',
@@ -470,8 +474,8 @@ function App() {
     if (filterStatus === 'unblocked') query = query.eq('is_unblocked', true);
     
     // Áp dụng các bộ lọc nâng cao nếu có (cho trường hợp không dùng RPC - fallback)
-    if (advSearchSheet) query = query.or(`old_map_sheet_number.eq.${advSearchSheet},new_map_sheet_number.eq.${advSearchSheet}`);
-    if (advSearchPlot) query = query.eq('plot_number', advSearchPlot);
+    if (advSearchSheet) query = query.or(`old_map_sheet_number.eq.${advSearchSheet},new_map_sheet_number.eq.${advSearchSheet},map_sheet_number.eq.${advSearchSheet}`);
+    if (advSearchPlot) query = query.or(`old_plot_number.eq.${advSearchPlot},new_plot_number.eq.${advSearchPlot},plot_number.eq.${advSearchPlot}`);
     if (advSearchCommune) query = query.or(`old_commune.eq.${advSearchCommune},new_commune.eq.${advSearchCommune}`);
     if (filterAgency) query = query.ilike('blocking_documents', `%${filterAgency}%`);
 
@@ -508,7 +512,7 @@ function App() {
          });
 
          if (error) {
-             if (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('structure') || error.message?.includes('p_map_sheet') || error.message?.includes('p_agency')) {
+             if (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('structure') || error.message?.includes('p_map_sheet') || error.message?.includes('p_agency') || error.message?.includes('new_area')) {
                  setShowSqlFix(true);
                  throw new Error('Cấu trúc Database cần cập nhật để hỗ trợ tìm kiếm đa điều kiện và cột Người nhập. Vui lòng chạy lệnh SQL (Fix) bên dưới.');
              }
@@ -543,6 +547,9 @@ function App() {
 
     } catch (err: any) {
       console.error('Lỗi tải dữ liệu:', err);
+      if (err.message?.includes('new_area') || err.message?.includes('old_plot_number') || err.message?.includes('new_plot_number')) {
+          setShowSqlFix(true);
+      }
       setErrorMsg(getErrorMessage(err)); 
     } finally {
       setLoading(false);
@@ -1090,6 +1097,33 @@ function App() {
               </div>
               
               <div className="flex items-center gap-2">
+                  {permissions.admin && (
+                      <button
+                          onClick={async () => {
+                              setLoading(true);
+                              try {
+                                  const { error } = await supabase.rpc('exec_sql', { sql: FIX_SQL_COMMAND });
+                                  if (error) {
+                                      // If exec_sql doesn't exist, we can't run it directly. Show the SQL instead.
+                                      setShowSqlFix(true);
+                                      setErrorMsg('Không thể chạy lệnh SQL trực tiếp. Vui lòng copy lệnh bên dưới và chạy trong Supabase SQL Editor.');
+                                  } else {
+                                      alert('Cập nhật CSDL thành công!');
+                                      window.location.reload();
+                                  }
+                              } catch (err: any) {
+                                  setShowSqlFix(true);
+                                  setErrorMsg('Lỗi khi cập nhật CSDL: ' + getErrorMessage(err));
+                              } finally {
+                                  setLoading(false);
+                              }
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 bg-yellow-500 text-white rounded-sm hover:bg-yellow-600 transition-colors text-sm font-medium shadow-sm"
+                          title="Cập nhật cấu trúc CSDL"
+                      >
+                          <RefreshCw size={16} /> <span className="hidden sm:inline">Cập nhật CSDL</span>
+                      </button>
+                  )}
                   {permissions.add && (
                     <>
                       <button
