@@ -153,7 +153,8 @@ RETURNS TABLE (
   old_area numeric,
   new_area numeric,
   old_plot_number text,
-  new_plot_number text
+  new_plot_number text,
+  attached_files jsonb
 )
 LANGUAGE plpgsql
 AS $$
@@ -211,7 +212,8 @@ BEGIN
     lr.old_area::numeric,
     lr.new_area::numeric,
     lr.old_plot_number::text,
-    lr.new_plot_number::text
+    lr.new_plot_number::text,
+    to_jsonb(lr.attached_files)
   FROM land_records lr
   WHERE
     (keyword IS NULL OR keyword = '' OR
@@ -512,7 +514,7 @@ function App() {
          });
 
          if (error) {
-             if (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('structure') || error.message?.includes('p_map_sheet') || error.message?.includes('p_agency') || error.message?.includes('new_area')) {
+             if (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('structure') || error.message?.includes('p_map_sheet') || error.message?.includes('p_agency') || error.message?.includes('new_area') || error.message?.includes('attached_files')) {
                  setShowSqlFix(true);
                  throw new Error('Cấu trúc Database cần cập nhật để hỗ trợ tìm kiếm đa điều kiện và cột Người nhập. Vui lòng chạy lệnh SQL (Fix) bên dưới.');
              }
@@ -547,7 +549,7 @@ function App() {
 
     } catch (err: any) {
       console.error('Lỗi tải dữ liệu:', err);
-      if (err.message?.includes('new_area') || err.message?.includes('old_plot_number') || err.message?.includes('new_plot_number')) {
+      if (err.message?.includes('new_area') || err.message?.includes('old_plot_number') || err.message?.includes('new_plot_number') || err.message?.includes('attached_files')) {
           setShowSqlFix(true);
       }
       setErrorMsg(getErrorMessage(err)); 
@@ -1426,7 +1428,7 @@ function App() {
                          )}
 
                          {/* Hiển thị file đính kèm */}
-                         {!debouncedSearchTerm && filterStatus === 'all' && !filterAgency && !advSearchSheet && !advSearchPlot && !advSearchCommune && record.attached_files && record.attached_files.length > 0 && (
+                         {record.attached_files && record.attached_files.length > 0 && (
                            <div className="mt-2 pt-2 border-t border-dashed border-gray-300">
                              <div className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
                                <Paperclip size={12} /> Tài liệu đính kèm:
