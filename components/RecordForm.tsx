@@ -164,34 +164,41 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
     setUploadingUnblockFile(true);
     try {
       const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = (reader.result as string).split(',')[1];
-        const payload = {
-            fileName: file.name,
-            mimeType: 'application/pdf',
-            fileData: base64Data 
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64data = (reader.result as string).split(',')[1];
+          resolve(base64data);
         };
-
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyfD0-l_9T8V4-jB2Z4U039qX5D9X85E1b8xQp-5O2iXm7N6Qp-1c88X9Z5T4/exec';
-
-        const response = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload),
-        });
-
-        const result = await response.json();
-        
-        if (result.success) {
-            setFormData(prev => ({
-                ...prev,
-                unblock_attached_files: [...(prev.unblock_attached_files || []), { id: result.fileId, name: file.name, url: result.fileUrl }]
-            }));
-            alert('Tải file đính kèm giải tỏa thành công!');
-        } else {
-            throw new Error(result.error);
-        }
-      };
+      });
       reader.readAsDataURL(file);
+      const base64 = await base64Promise;
+
+      const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXbQyjKR4_BDAR33LMdxZldWmj7pJY4TDV4D6cLRWBNLP0QTcFKGR_eaOcKojZObNAtQ/exec';
+
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            fileName: file.name,
+            mimeType: file.type,
+            base64: base64
+          }),
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8', // Dùng text/plain để tránh lỗi CORS Preflight
+          }
+      });
+
+      const result = await response.json();
+      
+      if (result.status === 'success') {
+          const newFile = { id: result.fileId, url: result.fileUrl, name: result.fileName };
+          setFormData(prev => ({
+              ...prev,
+              unblock_attached_files: [...(prev.unblock_attached_files || []), newFile]
+          }));
+          alert('Tải file đính kèm giải tỏa thành công!');
+      } else {
+          throw new Error(result.error || result.message);
+      }
     } catch (error) {
         console.error("Lỗi upload file giải tỏa:", error);
         alert('Có lỗi xảy ra khi tải file lên!');
