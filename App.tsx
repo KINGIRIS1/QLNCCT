@@ -320,6 +320,9 @@ type SortDirection = 'asc' | 'desc';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; recordId: string | null }>({ isOpen: false, recordId: null });
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   
   // State dữ liệu & Phân trang
   const [records, setRecords] = useState<LandRecord[]>([]);
@@ -676,20 +679,49 @@ function App() {
     }
   };
 
-  const handleDeleteRecord = async (id: string) => {
-    // Replace window.confirm with a custom modal or remove it.
-    // Since we are in an iframe, window.confirm is not recommended.
-    // For now, we will just proceed with the deletion.
-    // A better approach would be to implement a custom confirmation dialog component.
+  const handleDeleteRecord = (id: string) => {
+    setDeleteError('');
+    setDeletePassword('');
+    setDeleteConfirm({ isOpen: true, recordId: id });
+  };
+
+  const confirmDeleteRecord = async () => {
+    if (!deleteConfirm.recordId || !currentUser) return;
+    
+    if (!deletePassword.trim()) {
+      setDeleteError('Vui lòng nhập mật khẩu xác nhận.');
+      return;
+    }
+
     setLoading(true);
+    setDeleteError('');
+
     try {
-      const { error } = await supabase.from('land_records').delete().eq('id', id);
+      // 1. Verify password
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', currentUser.username)
+        .eq('password', deletePassword)
+        .single();
+
+      if (userError || !userData) {
+        setDeleteError('Mật khẩu không chính xác.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Proceed with deletion
+      const { error } = await supabase.from('land_records').delete().eq('id', deleteConfirm.recordId);
       if (error) throw error;
-      setRecords(prev => prev.filter(r => r.id !== id));
+      
+      setRecords(prev => prev.filter(r => r.id !== deleteConfirm.recordId));
       setTotalCount(prev => prev - 1);
       fetchStats(); 
+      setDeleteConfirm({ isOpen: false, recordId: null });
+      setDeletePassword('');
     } catch (err: any) {
-      setErrorMsg('Không thể xóa bản ghi: ' + getErrorMessage(err));
+      setDeleteError('Không thể xóa bản ghi: ' + getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -1608,6 +1640,65 @@ function App() {
           onClose={() => setShowChangePassword(false)} 
           user={currentUser}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.isOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-red-600 px-4 py-3 flex items-center justify-between text-white">
+              <h2 className="font-bold flex items-center gap-2 text-sm uppercase tracking-wide">
+                <ShieldAlert size={16} /> Xác Nhận Xóa
+              </h2>
+              <button onClick={() => setDeleteConfirm({ isOpen: false, recordId: null })} className="hover:bg-red-700 p-1 rounded transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-700 mb-4">
+                Hành động này <span className="font-bold text-red-600">không thể khôi phục</span>. Vui lòng nhập mật khẩu tài khoản <span className="font-semibold">{currentUser?.username}</span> để xác nhận.
+              </p>
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Mật khẩu xác nhận</label>
+                <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <Lock size={14} />
+                    </span>
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={e => setDeletePassword(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && confirmDeleteRecord()}
+                      className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none text-sm transition-shadow"
+                      placeholder="Nhập mật khẩu..."
+                      autoFocus
+                    />
+                </div>
+                {deleteError && <p className="text-xs text-red-600 mt-1.5 font-medium flex items-center gap-1"><Info size={12}/> {deleteError}</p>}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm({ isOpen: false, recordId: null })}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 transition-colors"
+                  disabled={loading}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteRecord}
+                  disabled={loading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  Xóa Hồ Sơ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
