@@ -43,6 +43,9 @@ export interface LandRecord {
   
   // Mới: Hỗ trợ đính kèm file
   attached_files?: AttachedFile[];
+  
+  // Mới: Hỗ trợ đính kèm file giải tỏa
+  unblock_attached_files?: AttachedFile[];
 }
 
 export interface PlotData {

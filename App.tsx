@@ -91,6 +91,10 @@ BEGIN
         ALTER TABLE land_records ADD COLUMN attached_files jsonb DEFAULT '[]'::jsonb;
     END IF;
 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'unblock_attached_files') THEN
+        ALTER TABLE land_records ADD COLUMN unblock_attached_files jsonb DEFAULT '[]'::jsonb;
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'land_records' AND column_name = 'old_map_sheet_number') THEN
         ALTER TABLE land_records ADD COLUMN old_map_sheet_number text;
     END IF;
@@ -154,7 +158,8 @@ RETURNS TABLE (
   new_area numeric,
   old_plot_number text,
   new_plot_number text,
-  attached_files jsonb
+  attached_files jsonb,
+  unblock_attached_files jsonb
 )
 LANGUAGE plpgsql
 AS $$
@@ -213,7 +218,8 @@ BEGIN
     lr.new_area::numeric,
     lr.old_plot_number::text,
     lr.new_plot_number::text,
-    to_jsonb(lr.attached_files)
+    to_jsonb(lr.attached_files),
+    to_jsonb(lr.unblock_attached_files)
   FROM land_records lr
   WHERE
     (keyword IS NULL OR keyword = '' OR
@@ -419,7 +425,8 @@ function App() {
     isUnblocked: !!item.is_unblocked,
     createdAt: item.created_at || '',
     createdBy: item.created_by || '',
-    attached_files: Array.isArray(item.attached_files) ? item.attached_files : []
+    attached_files: Array.isArray(item.attached_files) ? item.attached_files : [],
+    unblock_attached_files: Array.isArray(item.unblock_attached_files) ? item.unblock_attached_files : []
   });
 
   const mapRecordToDb = (item: LandRecord) => ({
@@ -446,7 +453,8 @@ function App() {
     notes: item.notes,
     is_unblocked: item.isUnblocked,
     created_by: item.createdBy, // Lưu người nhập
-    attached_files: item.attached_files || []
+    attached_files: item.attached_files || [],
+    unblock_attached_files: item.unblock_attached_files || []
   });
 
   const fetchStats = useCallback(async () => {
@@ -1418,6 +1426,23 @@ function App() {
                                <div className="text-green-700 font-semibold text-xs uppercase flex items-center gap-1">
                                   <Unlock size={12}/> VB Hủy bỏ: {record.unblockDoc}
                                 </div>
+                                {record.unblock_attached_files && record.unblock_attached_files.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {record.unblock_attached_files.map((file, idx) => (
+                                      <a 
+                                        key={idx} 
+                                        href={`https://drive.google.com/uc?export=download&id=${file.id}`} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded text-[10px] hover:bg-green-100 transition-colors border border-green-200"
+                                        title={file.name}
+                                      >
+                                        <Download size={10} />
+                                        <span className="truncate max-w-[100px]">{file.name}</span>
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
                            </div>
                          )}
 

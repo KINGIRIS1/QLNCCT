@@ -150,6 +150,63 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
   };
 
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadingUnblockFile, setUploadingUnblockFile] = useState(false);
+
+  const handleUnblockFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      alert('Vui lòng chỉ chọn file PDF!');
+      return;
+    }
+
+    setUploadingUnblockFile(true);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = (reader.result as string).split(',')[1];
+        const payload = {
+            fileName: file.name,
+            mimeType: 'application/pdf',
+            fileData: base64Data 
+        };
+
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyfD0-l_9T8V4-jB2Z4U039qX5D9X85E1b8xQp-5O2iXm7N6Qp-1c88X9Z5T4/exec';
+
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            setFormData(prev => ({
+                ...prev,
+                unblock_attached_files: [...(prev.unblock_attached_files || []), { id: result.fileId, name: file.name, url: result.fileUrl }]
+            }));
+            alert('Tải file đính kèm giải tỏa thành công!');
+        } else {
+            throw new Error(result.error);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+        console.error("Lỗi upload file giải tỏa:", error);
+        alert('Có lỗi xảy ra khi tải file lên!');
+    } finally {
+        setUploadingUnblockFile(false);
+        e.target.value = '';
+    }
+  };
+
+  const removeUnblockFile = (indexToRemove: number) => {
+    setFormData(prev => ({
+      ...prev,
+      unblock_attached_files: prev.unblock_attached_files?.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -598,16 +655,45 @@ const RecordForm: React.FC<RecordFormProps> = ({ initialData, currentUser, onSub
                 
                 {formData.isUnblocked && (
                     <div className="p-4 border-t border-green-200 animate-in fade-in slide-in-from-top-2 duration-200">
-                        <label className="block text-xs font-bold text-green-800 mb-1 uppercase">Số văn bản hủy bỏ / Giải tỏa</label>
-                        <input
-                            type="text"
-                            name="unblockDoc"
-                            value={formData.unblockDoc}
-                            onChange={handleChange}
-                            className="w-full border border-green-300 px-3 py-2 text-sm rounded-sm focus:border-green-600 outline-none font-medium text-gray-900 bg-white"
-                            placeholder="Nhập số văn bản..."
-                            required={formData.isUnblocked}
-                        />
+                        <div className="mb-3">
+                            <label className="block text-xs font-bold text-green-800 mb-1 uppercase">Số văn bản hủy bỏ / Giải tỏa</label>
+                            <input
+                                type="text"
+                                name="unblockDoc"
+                                value={formData.unblockDoc}
+                                onChange={handleChange}
+                                className="w-full border border-green-300 px-3 py-2 text-sm rounded-sm focus:border-green-600 outline-none font-medium text-gray-900 bg-white"
+                                placeholder="Nhập số văn bản..."
+                                required={formData.isUnblocked}
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-3 mb-3">
+                            <label className={`flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-medium cursor-pointer transition-colors ${uploadingUnblockFile ? 'bg-gray-200 text-gray-500' : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'}`}>
+                                {uploadingUnblockFile ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
+                                {uploadingUnblockFile ? 'Đang tải lên...' : 'Đính kèm file giải tỏa (PDF)'}
+                                <input type="file" accept=".pdf" className="hidden" onChange={handleUnblockFileUpload} disabled={uploadingUnblockFile} />
+                            </label>
+                        </div>
+
+                        {/* Hiển thị danh sách file giải tỏa đính kèm */}
+                        {formData.unblock_attached_files && formData.unblock_attached_files.length > 0 && (
+                            <div className="space-y-2">
+                                {formData.unblock_attached_files.map((file, index) => (
+                                    <div key={index} className="flex items-center justify-between bg-green-50 p-2 border border-green-200 rounded-sm text-sm">
+                                        <div className="flex items-center gap-2 text-green-800">
+                                            <Paperclip size={14} className="text-green-600" />
+                                            <a href={`https://drive.google.com/uc?export=download&id=${file.id}`} target="_blank" rel="noopener noreferrer" className="hover:text-green-900 hover:underline">
+                                                {file.name}
+                                            </a>
+                                        </div>
+                                        <button type="button" onClick={() => removeUnblockFile(index)} className="text-red-500 hover:text-red-700 p-1">
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
